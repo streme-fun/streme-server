@@ -188,7 +188,7 @@ module.exports = {
         const data = 
         {
             "id": 69,
-            "created_at": FieldValue.serverTimestamp(),
+            "timestamp": FieldValue.serverTimestamp(),
             "block_number": blockNumber,
             "tx_hash": txnHash,
             "contract_address": tokenAddress,
