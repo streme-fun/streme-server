@@ -19,6 +19,35 @@ const sleep = (milliseconds) => {
     return new Promise(resolve => setTimeout(resolve, milliseconds))
 };
 
+module.exports.mentionCreated = async function (event) {
+    const snapshot = event.data;
+    if (!snapshot) {
+        console.log("No data associated with the event");
+        return;
+    }
+    const cast = snapshot.data();
+    // TODO: handle the mention
+
+} // mentionCreated   
+
+module.exports.tokenCreated = async function (event) {
+    const snapshot = event.data;
+    if (!snapshot) {
+        console.log("No data associated with the event");
+        return;
+    }
+    const token = snapshot.data();
+    // TODO: fetch staking data + uni pool + add to db
+
+} // tokenCreated   
+
+module.exports.mentionCron = async function(minter) {
+    console.log("start mentionCron");
+    //const db = getFirestore();
+    
+    console.log("end mentionCron");
+} // mentionCron
+
 api.use(cors({ origin: true })); // enable origin cors
 
 api.get(['/'], async function (req, res) {
