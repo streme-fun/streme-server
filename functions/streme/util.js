@@ -40,10 +40,12 @@ module.exports = {
         var addr = {};
         if (util.chain == "baseSepolia") {
             addr.streme = process.env.STREME;
-            addr.stakingFactory = process.env.STAKING_FACTORY;
-            addr.lpFactory = process.env.LP_FACTORY;
-            addr.superTokenFactory = process.env.SUPER_TOKEN_FACTORY;
-            addr.lpLocker = process.env.LP_LOCKER;
+            addr.stakingFactory = process.env.STREME_STAKING_FACTORY;
+            addr.postDeployFactory = process.env.STREME_STAKING_FACTORY;
+            addr.lpFactory = process.env.STREME_LP_FACTORY;
+            addr.superTokenFactory = process.env.STREME_SUPER_TOKEN_FACTORY;
+            addr.tokenFactory = process.env.STREME_SUPER_TOKEN_FACTORY;
+            addr.lpLocker = process.env.STREME_LIQUIDITY_LOCKER;
             addr.uniswapV3Factory = process.env.UNISWAP_V3_FACTORY;
             addr.weth = process.env.WETH;
             addr.gdaForwarder = process.env.GDA_FORWARDER;
@@ -79,8 +81,23 @@ module.exports = {
         console.log("autonomeChat", json);
         // parse the response as JSON:
         // remove /n line breaks from the response:
-        json.response = json.response[0].replace(/\n/g, "");
-        const responseJson = JSON.parse(json.response);
+        var aiResponse = json.response[0].replace(/\n/g, "");
+        // check that claudeResponse begins with { and ends with }:
+        if (aiResponse.startsWith("{") && aiResponse.endsWith("}")) {
+            // no-op
+        } else if (aiResponse.includes("{") && aiResponse.includes("}")) {
+            // extract the JSON object from the text response:
+            const start = aiResponse.indexOf("{");
+            const end = aiResponse.lastIndexOf("}");
+            aiResponse = aiResponse.substring(start, end + 1);
+        } else {
+            resolve({
+                "name": null,
+                "symbol": null,
+                "response": aiResponse
+            });
+        } // if 
+        const responseJson = JSON.parse(aiResponse);
         console.log("responseJson", responseJson);
         return responseJson;
     }, // autonomeChat
@@ -126,12 +143,12 @@ module.exports = {
         const util = module.exports;
         const addr = util.getAddresses();
         const provider = util.getProvider();
-        const keys = util.getKeys();
-        var random = Math.floor(Math.random() * keys.length);
-        if (minter) {
-            random = minter;
-        }
-        const key = keys[random];
+        //const keys = util.getKeys();
+        //var random = Math.floor(Math.random() * keys.length);
+        //if (minter) {
+        //    random = minter;
+        //}
+        const key = minter;
         const signer = new ethers.Wallet(key, provider);
         const streme = new ethers.Contract(addr.streme, StremeJSON.abi, signer);
         const poolConfig = {
@@ -142,7 +159,7 @@ module.exports = {
         const tokenConfig = {
             "_name": name,
             "_symbol": symbol,
-            "_supply": ethers.parseEther("100000000000"), // 100 billion
+            "_supply": ethers.utils.parseEther("100000000000"), // 100 billion
             "_fee": 10000,
             "_salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "_deployer": deployer,
@@ -152,14 +169,15 @@ module.exports = {
             "_poolConfig": poolConfig
         };
         var salt, tokenAddress;
-        console.log(tokenConfig["_symbol"], tokenConfig["_deployer"], addr.tokenFactory, addr.pairedToken);
-        const result = await streme.generateSalt(tokenConfig["_symbol"], tokenConfig["_deployer"], addr.tokenFactory, addr.pairedToken);
+        console.log(tokenConfig["_symbol"], tokenConfig["_deployer"], addr.tokenFactory, poolConfig.pairedToken);
+        const result = await streme.generateSalt(tokenConfig["_symbol"], tokenConfig["_deployer"], addr.tokenFactory, poolConfig.pairedToken);
         salt = result[0];
         tokenAddress = result[1];
         console.log("Salt: ", salt);
         tokenConfig["_salt"] = salt;
-        console.log(addr.tokenFactory, addr.postDeployFactory, addr.lpFactory, ethers.ZeroAddress, tokenConfig);
-        const tx = await (await streme.deployToken(addr.tokenFactory, addr.postDeployFactory, addr.lpFactory, ethers.ZeroAddress, tokenConfig)).wait();
+        console.log(addr.tokenFactory, addr.postDeployFactory, addr.lpFactory, ethers.constants.AddressZero, tokenConfig);
+        const tx = await (await streme.deployToken(addr.tokenFactory, addr.postDeployFactory, addr.lpFactory, ethers.constants.AddressZero, tokenConfig)).wait();
+        console.log("Transaction", tx);
         const txnHash = tx.transactionHash;
         const blockNumber = tx.blockNumber;
         console.log("Token Address: ", tokenAddress);
@@ -197,7 +215,6 @@ module.exports = {
         const db = getFirestore();
         const tokensRef = db.collection("tokens").doc(tokenAddress);
         const tokenDoc = await tokensRef.set(data);
-        // TODO: triggers to fetch event data for staking
         return tokenAddress;
     }, // deployToken
 
@@ -286,11 +303,13 @@ module.exports = {
             // check if user qualifies. neynar score?
             var allowed = false;
             const allowList = [
-                process.env.FREME_FID
+                parseInt(process.env.FREME_FID)
             ];
+            console.log("allowList", allowList);
             // is cast.author.fid in allowList?
             if (allowList.includes(cast.author.fid)) {
                 allowed = true;
+                console.log("allowed from allowList", cast.author.fid);
             }
             if ("allowed" in cast && cast.allowed) {
                 allowed = true;
@@ -332,15 +351,12 @@ module.exports = {
             // query for doc in tokens collection where cast_hash == cast.hash:
             const query = db.collection("tokens").where("cast_hash", "==", cast.hash);
             const docRef = await query.get();
-            var doc;
-            docRef.forEach((doc) => {
-                console.log("doc", doc.id, "=>", doc.data());
-                doc = doc;
-            });
-            //var doc = await docRef.get();
-            if (doc.exists) {
-                console.log("doc exists, mention already processed");
+            // are there any results?
+            if (!docRef.empty) {
+                console.log("docRef not empty, mention already processed");
                 return resolve({"status": "error", "reason": "Token already created"});
+            } else {
+                console.log("docRef empty, mention not processed");
             }
                     
             // send cast to Autonome for processing
@@ -377,7 +393,7 @@ module.exports = {
             
             // deploy token
             const doDeploy = true;
-            if (doMint) {
+            if (doDeploy) {
                 const tokenAddress = await util.deployToken(ai.name, ai.symbol, creatorAddress, cast, minter);
                 console.log("deployed", tokenAddress);
                 if (!tokenAddress) {
@@ -414,6 +430,13 @@ module.exports = {
             return resolve({"status": "processed"});
         }); // return promise
     }, // processMention
+
+    "getMinterKeys": function() {
+        const minterKeys = [
+            process.env.MINTER_1
+        ];
+        return minterKeys;
+    }, // getMinterKeys
 
 
 

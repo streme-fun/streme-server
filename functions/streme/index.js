@@ -19,19 +19,6 @@ const sleep = (milliseconds) => {
     return new Promise(resolve => setTimeout(resolve, milliseconds))
 };
 
-module.exports.mentionCreated = async function (event) {
-    var snapshot = event.data;
-    if ("after" in snapshot) {
-        snapshot = snapshot.after;
-    }
-    if (!snapshot) {
-        console.log("No data associated with the event");
-        return;
-    }
-    // TODO: do we need this at all if we are doing the queue via cron?
-    return;
-} // mentionCreated   
-
 module.exports.tokenCreated = async function (event) {
     const snapshot = event.data;
     if (!snapshot) {
@@ -49,17 +36,18 @@ module.exports.tokenCreated = async function (event) {
     return;
 } // tokenCreated   
 
-module.exports.mentionCron = async function(context, minter) {
+module.exports.mentionCron = async function(minter) {
     const batchSize = 1;
   
-    await sleep(1000 * minter);
+    //await sleep(1000 * minter);
   
+    const db = getFirestore();
     var query = db.collection('mentions').where('status', '==', "pending").orderBy('created','asc').limit(batchSize);
   
     var doc;
     const snapshot = await query.get();
     if (snapshot.empty) {
-      console.log(`Nothing in this queue, Minter ${minter}`);
+      console.log(`Nothing in this queue`);
       return;
     }
     var count = 0;

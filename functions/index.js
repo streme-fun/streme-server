@@ -22,6 +22,10 @@ const {
     FirestoreEvent
   } = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
+const {defineSecret} = require("firebase-functions/params");
+
+// Define the secret parameter
+const MINTER_1 = defineSecret("MINTER_1");
 
 var streme = require(__base + 'streme');
 
@@ -33,23 +37,6 @@ exports.api = onRequest({
         return streme.api(req, res);
 }); // api
 
-exports.mentionCreated = onDocumentCreated("mentions/{castId}", {
-        timeoutSeconds: 20,
-        memory: "1GiB",
-    },    
-    (event) => {
-        return streme.mentionCreated(event);
-});
-
-exports.mentionUpdated = onDocumentUpdated("mentions/{castId}", {
-    timeoutSeconds: 20,
-    memory: "1GiB",
-},    
-(event) => {
-    // this hook for testing only
-    return streme.mentionCreated(event);
-});
-
 exports.tokenCreated = onDocumentCreated("tokens/{tokenAddress}", {
         timeoutSeconds: 20,
         memory: "1GiB",
@@ -58,9 +45,14 @@ exports.tokenCreated = onDocumentCreated("tokens/{tokenAddress}", {
         return streme.tokenCreated(event);
 });
 
-exports.mentionCron = onSchedule("every 1 minutes", async (event) => {
-    const minter = 1;
-    return streme.mentionCron(minter);
+exports.mentionCron = onSchedule({
+        memory: "1GiB",
+        timeoutSeconds: 120,
+        schedule: "every 1 minutes",
+        secrets: [MINTER_1] 
+    }, async (event) => {
+        const minter = MINTER_1.value();
+        return streme.mentionCron(minter);
 });
 
 
