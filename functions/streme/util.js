@@ -175,6 +175,7 @@ module.exports = {
         const result = await streme.generateSalt(tokenConfig["_symbol"], tokenConfig["_deployer"], addr.tokenFactory, poolConfig.pairedToken);
         salt = result[0];
         tokenAddress = result[1];
+        tokenAddress = tokenAddress.toLowerCase();
         console.log("Salt: ", salt);
         tokenConfig["_salt"] = salt;
         console.log(addr.tokenFactory, addr.postDeployFactory, addr.lpFactory, ethers.constants.AddressZero, tokenConfig);
@@ -202,9 +203,9 @@ module.exports = {
             "presale_id": null,
             "chain_id": util.chainId(),
             "metadata": null,
-            "tokenFactory": addr.tokenFactory,
-            "postDeployHook": addr.stakingFactory,
-            "liquidityFactory": addr.lpFactory,
+            "tokenFactory": addr.tokenFactory.toLowerCase(),
+            "postDeployHook": addr.stakingFactory.toLowerCase(),
+            "liquidityFactory": addr.lpFactory.toLowerCase(),
             "postLpHook": ethers.constants.AddressZero,
             "poolConfig": poolConfig,
         };
@@ -231,7 +232,7 @@ module.exports = {
             const abi = [ "function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool)" ];
             const uniswapV3Factory = new ethers.Contract(addr.uniswapV3Factory, abi, provider);
             const poolAddress = await uniswapV3Factory.getPool(tokenA, tokenB, fee);
-            resolve(poolAddress);
+            resolve(poolAddress.toLowerCase());
         }); // return new Promise
     }, // getUniswapV3Pool
 
@@ -259,7 +260,7 @@ module.exports = {
                     pool = parsedLog.args.pool;
                 }
             }
-            resolve({"stakeToken": stakeToken, "pool": pool});
+            resolve({"stakeToken": stakeToken.toLowerCase(), "pool": pool.toLowerCase()});
         }); // return new Promise
     }, // getStakingData
 
