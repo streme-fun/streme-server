@@ -255,7 +255,7 @@ module.exports = {
                 const parsedLog = stakingFactory.interface.parseLog(eventLog);
                 console.log("parsedLog", parsedLog);
                 log("parsedLog.args.stakeToken", parsedLog.args.stakeToken);
-                if (parsedLog.args.depositToken == token.contract_address) {
+                if (parsedLog.args.depositToken.toLowerCase() == token.contract_address.toLowerCase()) {
                     stakeToken = parsedLog.args.stakeToken;
                     pool = parsedLog.args.pool;
                 }
@@ -304,7 +304,7 @@ module.exports = {
         const util = module.exports;
         const db = getFirestore();
         return new Promise(async function(resolve, reject) {
-            const sendCastEnabled = false;
+            const sendCastEnabled = true;
             // check if user qualifies. neynar score?
             var allowed = false;
             const allowList = [
