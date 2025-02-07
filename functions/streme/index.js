@@ -77,7 +77,7 @@ module.exports.mentionCron = async function(minter) {
         console.log("No such document!");
       } // if doc.exists
     }); // for each doc
-    console.log(`Processed ${count} mentions, Minter ${minter}`);
+    console.log(`Processed ${count} mentions`);
     return 1;
 } // mentionCron
 

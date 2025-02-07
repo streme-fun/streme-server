@@ -244,17 +244,19 @@ module.exports = {
             // get data from StakedTokenCreated event
             // TODO: update contract to add indexed to depositToken
             const filter = stakingFactory.filters.StakedTokenCreated();
-            const logs = await provider.getLogs(filter, {fromBlock: token.block_number, toBlock: token.block_number});
+            const logs = await stakingFactory.queryFilter(filter, token.block_number, token.block_number);
+            //const logs = await provider.queryFilter(filter, {fromBlock: token.block_number, toBlock: token.block_number});
             console.log("logs", logs);
             var stakeToken = '';
             var pool = '';
             for (var i = 0; i < logs.length; i++) {
-                const log = logs[i];
-                const parsedLog = stakingFactory.interface.parseLog(log);
+                const eventLog = logs[i];
+                const parsedLog = stakingFactory.interface.parseLog(eventLog);
                 console.log("parsedLog", parsedLog);
-                if (parsedLog.values.depositToken == token.contract_address) {
-                    stakeToken = parsedLog.values.stakeToken;
-                    pool = parsedLog.values.pool;
+                log("parsedLog.args.stakeToken", parsedLog.args.stakeToken);
+                if (parsedLog.args.depositToken == token.contract_address) {
+                    stakeToken = parsedLog.args.stakeToken;
+                    pool = parsedLog.args.pool;
                 }
             }
             resolve({"stakeToken": stakeToken, "pool": pool});
