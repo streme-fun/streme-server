@@ -160,7 +160,7 @@ module.exports = {
         const txnHash = tx.transactionHash;
         const blockNumber = tx.blockNumber;
         console.log("Token Address: ", tokenAddress);
-        // add to firestore + triggers to fecth event data for staking + uniswap pool
+        // add to firestore:
         const data = 
         {
             "id": 69,
@@ -185,11 +185,26 @@ module.exports = {
             "postLpHook": ethers.ZeroAddress,
             "poolConfig": poolConfig,
         };
+        const pool = await util.getUniswapV3Pool(tokenAddress, addr.weth, tokenConfig["_fee"]);
+        data["pool_address"] = pool;
         const db = getFirestore();
         const tokensRef = db.collection("tokens").doc(tokenAddress);
         const tokenDoc = await tokensRef.set(data);
+        // TODO: triggers to fetch event data for staking
         return tokenAddress;
     }, // deployToken
+
+    "getUniswapV3Pool": async (token0, token1) => {
+        return new Promise(async (resolve, reject) => {
+            const util = module.exports;
+            const addr = util.getAddresses();
+            const provider = util.getProvider();
+            const abi = [ "function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool)" ];
+            const uniswapV3Factory = new ethers.Contract(addr.uniswapV3Factory, abi, provider);
+            const poolAddress = await uniswapV3Factory.getPool(token0, token1);
+            resolve(poolAddress);
+        }); // return new Promise
+    }
 
 
 }; // module.exports
