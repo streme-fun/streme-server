@@ -104,39 +104,41 @@ module.exports = {
 
     "getImageFromCast": async (embeds) => {
         const util = module.exports;
-        var imageEmbed;
-        var contentType;
-        var foundImage = false;
-        for (var i = 0; i < embeds.length; i++) {
-            const embed = embeds[i];
-            if ("url" in embed) {
-                const url = embed.url;
-                // confirm this is an image
-                if ("metadata" in embed && "content_type" in embed.metadata && embed.metadata.content_type.includes("image")) {
-                    contentType = embed.metadata.content_type;
-                    foundImage = true;
-                    imageEmbed = embed;
-                } else if ("metadata" in embed && "_status" in embed.metadata && embed.metadata._status == "PENDING") {
-                    // use fetch to to send HEAD request to url to get content-type:
-                    const response = await fetch(url, {method: 'HEAD'});
-                    const headers = response.headers;
-                    const contentType = headers.get('content-type');
-                    if (contentType && contentType.includes("image")) {
+        return new Promise(async function(resolve, reject) {
+            var imageEmbed;
+            var contentType;
+            var foundImage = false;
+            for (var i = 0; i < embeds.length; i++) {
+                const embed = embeds[i];
+                if ("url" in embed) {
+                    const url = embed.url;
+                    // confirm this is an image
+                    if ("metadata" in embed && "content_type" in embed.metadata && embed.metadata.content_type.includes("image")) {
+                        contentType = embed.metadata.content_type;
                         foundImage = true;
                         imageEmbed = embed;
-                    }
-                } // if image
-            } // if url in embed
-            // break loop if image found
-            if (foundImage) {
-                break;
+                    } else if ("metadata" in embed && "_status" in embed.metadata && embed.metadata._status == "PENDING") {
+                        // use fetch to to send HEAD request to url to get content-type:
+                        const response = await fetch(url, {method: 'HEAD'});
+                        const headers = response.headers;
+                        const contentType = headers.get('content-type');
+                        if (contentType && contentType.includes("image")) {
+                            foundImage = true;
+                            imageEmbed = embed;
+                        }
+                    } // if image
+                } // if url in embed
+                // break loop if image found
+                if (foundImage) {
+                    break;
+                }
+            } // for i (embeds)
+            if (!foundImage) {
+                return resolve("");
+            } else {
+                return resolve(imageEmbed.url);
             }
-        } // for i (embeds)
-        if (!foundImage) {
-            return "";
-        } else {
-            return imageEmbed.url;
-        }
+        }); // return new Promise
     }, // getImageFromCast
 
     "deployToken": async (name, symbol, deployer, cast, minter) => {
@@ -164,7 +166,7 @@ module.exports = {
             "_salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "_deployer": deployer,
             "_fid": cast.author.fid,
-            "_image": util.getImageFromCast(cast.embeds),
+            "_image": await util.getImageFromCast(cast.embeds),
             "_castHash": cast.hash,
             "_poolConfig": poolConfig
         };
@@ -203,11 +205,11 @@ module.exports = {
             "tokenFactory": addr.tokenFactory,
             "postDeployHook": addr.stakingFactory,
             "liquidityFactory": addr.lpFactory,
-            "postLpHook": ethers.ZeroAddress,
+            "postLpHook": ethers.constants.AddressZero,
             "poolConfig": poolConfig,
         };
-        const pool = await util.getUniswapV3Pool(tokenAddress, addr.weth, tokenConfig["_fee"]);
-        data["pool_address"] = pool;
+        //const pool = await util.getUniswapV3Pool(tokenAddress, addr.weth, tokenConfig["_fee"]);
+        //data["pool_address"] = pool;
         // add channel if it exists
         if ("channel" in cast && cast.channel && "id" in cast.channel) {
             data.channel = cast.channel.id;
@@ -221,7 +223,7 @@ module.exports = {
     "getUniswapV3Pool": async (token) => {
         return new Promise(async (resolve, reject) => {
             const tokenA = token.contract_address;
-            const tokenB = token.poolConfig.paired_token ? token.poolConfig.paired_token : process.env.WETH;
+            const tokenB = token.poolConfig.pairedToken ? token.poolConfig.pairedToken : process.env.WETH;
             const fee = token.poolConfig.devBuyFee ? token.poolConfig.devBuyFee : 10000;
             const util = module.exports;
             const addr = util.getAddresses();
@@ -410,7 +412,7 @@ module.exports = {
                 } // if !minted
                 await util.logDeploy({
                     "token": tokenAddress,  
-                    "creator": data.fid,
+                    "creator": cast.author.fid,
                 });
             } // if doMint
             if (sendCastEnabled) {
@@ -430,6 +432,14 @@ module.exports = {
             return resolve({"status": "processed"});
         }); // return promise
     }, // processMention
+
+    "logDeploy": async function(data) {
+        return new Promise(async function(resolve, reject) {
+            const db = getFirestore();
+            // TODO: log stuff?
+            return resolve(true);
+        }); // return new Promise
+    }, // logDeploy
 
     "getMinterKeys": function() {
         const minterKeys = [

@@ -37,8 +37,9 @@ exports.api = onRequest({
         return streme.api(req, res);
 }); // api
 
-exports.tokenCreated = onDocumentCreated("tokens/{tokenAddress}", {
-        timeoutSeconds: 20,
+exports.tokenCreated = onDocumentCreated({
+        document: "tokens/{tokenAddress}",
+        timeoutSeconds: 60,
         memory: "1GiB",
     },    
     (event) => {

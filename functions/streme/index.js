@@ -20,14 +20,18 @@ const sleep = (milliseconds) => {
 };
 
 module.exports.tokenCreated = async function (event) {
+    log("tokenCreated", event);
     const snapshot = event.data;
     if (!snapshot) {
         console.log("No data associated with the event");
         return;
     }
     const token = snapshot.data();
+    log("tokenCreated", token);
     const poolAddress = await util.getUniswapV3Pool(token);
+    log("pool", poolAddress);
     const staking = await util.getStakingData(token);
+    log("staking", staking);
     snapshot.ref.update({
         "pool_address": poolAddress,
         "staking_address": staking.stakeToken,
