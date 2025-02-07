@@ -37,6 +37,16 @@ exports.api = onRequest({
         return streme.api(req, res);
 }); // api
 
+exports.mentionCreated = onDocumentCreated({
+    document: "mentions/{castHash}",
+    timeoutSeconds: 120,
+    memory: "1GiB",
+    secrets: [MINTER_1] 
+},    
+(event) => {
+    return streme.mentionCreated(event, MINTER_1.value());
+});
+
 exports.tokenCreated = onDocumentCreated({
         document: "tokens/{tokenAddress}",
         timeoutSeconds: 60,

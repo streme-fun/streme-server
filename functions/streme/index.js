@@ -19,6 +19,41 @@ const sleep = (milliseconds) => {
     return new Promise(resolve => setTimeout(resolve, milliseconds))
 };
 
+module.exports.mentionCreated = async function (event, minter) {
+    log("tokenCreated", event);
+    const snapshot = event.data;
+    if (!snapshot) {
+        console.log("No data associated with the event");
+        return;
+    }
+    const mention = snapshot.data();
+    // if there a mention with status processing right now?
+    const db = getFirestore();
+    const mentionsRef = db.collection('mentions');
+    const query = mentionsRef.where('status', '==', "processing").limit(1);
+    const querySnapshot = await query.get();
+    if (!querySnapshot.empty) {
+        console.log("There is a mention processing right now");
+        return 1;
+    }
+    const cast = mention.cast;
+    // update status to minting
+    await snapshot.ref.update({
+        "status": "processing"
+    });
+    // process cast
+    const result = await util.processMention(cast, minter);
+    var updates = {
+        "status": "status" in result ? result.status : "processed"
+    }
+    if ("reason" in result) {
+        updates.reason = result.reason;
+    }
+    await snapshot.ref.update(updates);
+    console.log(`Processed 1 mentions`);
+    return 1;
+} // mentionCreated   
+
 module.exports.tokenCreated = async function (event) {
     log("tokenCreated", event);
     const snapshot = event.data;
