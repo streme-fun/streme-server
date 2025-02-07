@@ -201,17 +201,46 @@ module.exports = {
         return tokenAddress;
     }, // deployToken
 
-    "getUniswapV3Pool": async (token0, token1) => {
+    "getUniswapV3Pool": async (token) => {
         return new Promise(async (resolve, reject) => {
+            const tokenA = token.contract_address;
+            const tokenB = token.poolConfig.paired_token ? token.poolConfig.paired_token : process.env.WETH;
+            const fee = token.poolConfig.devBuyFee ? token.poolConfig.devBuyFee : 10000;
             const util = module.exports;
             const addr = util.getAddresses();
             const provider = util.getProvider();
             const abi = [ "function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool)" ];
             const uniswapV3Factory = new ethers.Contract(addr.uniswapV3Factory, abi, provider);
-            const poolAddress = await uniswapV3Factory.getPool(token0, token1);
+            const poolAddress = await uniswapV3Factory.getPool(tokenA, tokenB, fee);
             resolve(poolAddress);
         }); // return new Promise
     }, // getUniswapV3Pool
+
+    "getStakingData": async (token) => {
+        return new Promise(async (resolve, reject) => {
+            const util = module.exports;
+            const addr = util.getAddresses();
+            const provider = util.getProvider();
+            const stakingFactory = new ethers.Contract(addr.stakingFactory, StakingFactoryJSON.abi, provider);
+            // get data from StakedTokenCreated event
+            // TODO: update contract to add indexed to depositToken
+            const filter = stakingFactory.filters.StakedTokenCreated();
+            const logs = await provider.getLogs(filter, {fromBlock: token.block_number, toBlock: token.block_number});
+            console.log("logs", logs);
+            var stakeToken = '';
+            var pool = '';
+            for (var i = 0; i < logs.length; i++) {
+                const log = logs[i];
+                const parsedLog = stakingFactory.interface.parseLog(log);
+                console.log("parsedLog", parsedLog);
+                if (parsedLog.values.depositToken == token.contract_address) {
+                    stakeToken = parsedLog.values.stakeToken;
+                    pool = parsedLog.values.pool;
+                }
+            }
+            resolve({"stakeToken": stakeToken, "pool": pool});
+        }); // return new Promise
+    }, // getStakingData
 
     "sendCast": async function(cast) {
         const util = module.exports;

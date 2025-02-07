@@ -39,8 +39,14 @@ module.exports.tokenCreated = async function (event) {
         return;
     }
     const token = snapshot.data();
-    // TODO: fetch staking data + uni pool + add to db
-
+    const poolAddress = await util.getUniswapV3Pool(token);
+    const staking = await util.getStakingData(token);
+    snapshot.ref.update({
+        "pool_address": poolAddress,
+        "staking_address": staking.stakeToken,
+        "staking_pool": staking.pool
+    });
+    return;
 } // tokenCreated   
 
 module.exports.mentionCron = async function(context, minter) {
