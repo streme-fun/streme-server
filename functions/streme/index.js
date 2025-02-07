@@ -96,4 +96,25 @@ api.get(['/chat'], async function (req, res) {
     }
 }); // GET /chat
 
+api.post('/api/webhook/mention/streme', async function (req, res) {
+    console.log("mention streme webhook req.body", JSON.stringify(req.body));
+    const cast = req.body.data;
+    // check if this cast has already been added to mentions collection:
+    // firestor doc where doc.id is cast.hash
+    const docRef = db.collection('mentions').doc(cast.hash);
+    const doc = await docRef.get();
+    if (doc.exists) {
+      console.log("cast already processed");
+      return res.json({"result": "error", "response": "Cast already processed"});
+    }
+    // add it to mentions collection:
+    const data = {
+      "status": "pending",
+      "created": FieldValue.serverTimestamp(),
+      "cast": cast
+    };
+    await docRef.set(data);
+    return res.json({"result": "ok"});
+}); // POST /api/webhook/mention/streme
+
 module.exports.api = api;
