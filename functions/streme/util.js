@@ -177,8 +177,13 @@ module.exports = {
             "type": "streme_s" + util.season,
             "pair": "WETH",
             "presale_id": null,
-            "chain_id": util.chaindId(),
-            "metadata": null
+            "chain_id": util.chainId(),
+            "metadata": null,
+            "tokenFactory": addr.tokenFactory,
+            "postDeployHook": addr.stakingFactory,
+            "lpFactory": addr.lpFactory,
+            "postLpHook": ethers.ZeroAddress,
+            "poolConfig": poolConfig,
         };
         const db = getFirestore();
         const tokensRef = db.collection("tokens").doc(tokenAddress);
