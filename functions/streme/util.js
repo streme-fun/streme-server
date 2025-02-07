@@ -181,7 +181,7 @@ module.exports = {
             "metadata": null,
             "tokenFactory": addr.tokenFactory,
             "postDeployHook": addr.stakingFactory,
-            "lpFactory": addr.lpFactory,
+            "liquidityFactory": addr.lpFactory,
             "postLpHook": ethers.ZeroAddress,
             "poolConfig": poolConfig,
         };
@@ -204,7 +204,26 @@ module.exports = {
             const poolAddress = await uniswapV3Factory.getPool(token0, token1);
             resolve(poolAddress);
         }); // return new Promise
-    }
+    }, // getUniswapV3Pool
+
+    "sendCast": async function(cast) {
+        const util = module.exports;
+        return new Promise(async function(resolve, reject) {
+            var response = await fetch(`https://api.neynar.com/v2/farcaster/cast`, { 
+                method: 'POST', 
+                headers: {
+                    'Accept': 'application/json', 
+                    'Content-Type': 'application/json',
+                    'Api_key': process.env.NEYNAR_API_KEY
+                },
+                body: JSON.stringify(cast)
+            });
+            var castResult = await response.json();
+            console.log("neynar POST cast", JSON.stringify(castResult));
+            return resolve(castResult);
+        }); // return new Promise
+    }, // sendCast
+
 
 
 }; // module.exports
