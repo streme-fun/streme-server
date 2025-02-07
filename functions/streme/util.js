@@ -22,7 +22,36 @@ const SuperTokenFactoryJSON = require("./abis/SuperTokenFactory.json");
 
 module.exports = {
 
-    "getFirestore": getFirestore,
+    "chain": "baseSepolia",
+
+    "season": 1,
+
+    "getAddresses": () => {
+        const util = module.exports;
+        var addr = {};
+        if (util.chain == "baseSepolia") {
+            addr.streme = process.env.STREME;
+            addr.stakingFactory = process.env.STAKING_FACTORY;
+            addr.lpFactory = process.env.LP_FACTORY;
+            addr.superTokenFactory = process.env.SUPER_TOKEN_FACTORY;
+            addr.lpLocker = process.env.LP_LOCKER;
+            addr.uniswapV3Factory = process.env.UNISWAP_V3_FACTORY;
+            addr.weth = process.env.WETH;
+            addr.gdaForwarder = process.env.GDA_FORWARDER;
+        } else if (util.chain == "base") {
+            // TODO: add addresses for base chain
+        }
+        return addr;
+    }, // getAddresses
+
+    "getProvider": () => {
+        const util = module.exports;
+        if (util.chain == "baseSepolia") {
+            return new ethers.providers.JsonRpcProvider(process.env.API_URL_BASESEPOLIA);
+        } else if (util.chain == "base") {
+            return new ethers.providers.JsonRpcProvider(process.env.API_URL_BASE);
+        }
+    }, // getProvider
 
     "autonomeChat": async (message) => {
         const apiUrl = "https://autonome.alt.technology/streme-aelyud/chat";
@@ -46,5 +75,83 @@ module.exports = {
         console.log("responseJson", responseJson);
         return responseJson;
     }, // autonomeChat
+
+    "getImageFromCast": async (embeds) => {
+        const util = module.exports;
+        var imageEmbed;
+        var contentType;
+        var foundImage = false;
+        for (var i = 0; i < embeds.length; i++) {
+            const embed = embeds[i];
+            if ("url" in embed) {
+                const url = embed.url;
+                // confirm this is an image
+                if ("metadata" in embed && "content_type" in embed.metadata && embed.metadata.content_type.includes("image")) {
+                    contentType = embed.metadata.content_type;
+                    foundImage = true;
+                    imageEmbed = embed;
+                } else if ("metadata" in embed && "_status" in embed.metadata && embed.metadata._status == "PENDING") {
+                    // use fetch to to send HEAD request to url to get content-type:
+                    const response = await fetch(url, {method: 'HEAD'});
+                    const headers = response.headers;
+                    const contentType = headers.get('content-type');
+                    if (contentType && contentType.includes("image")) {
+                        foundImage = true;
+                        imageEmbed = embed;
+                    }
+                } // if image
+            } // if url in embed
+            // break loop if image found
+            if (foundImage) {
+                break;
+            }
+        } // for i (embeds)
+        if (!foundImage) {
+            return "";
+        } else {
+            return imageEmbed.url;
+        }
+    }, // getImageFromCast
+
+    "deployToken": async (name, symbol, deployer, cast) => {
+        const util = module.exports;
+        const addr = util.getAddresses();
+        const provider = util.getProvider();
+        const keys = util.getKeys();
+        const random = Math.floor(Math.random() * keys.length);
+        const key = keys[random];
+        const signer = new ethers.Wallet(key, provider);
+        const streme = new ethers.Contract(addr.streme, StremeJSON.abi, signer);
+        const poolConfig = {
+            "tick": -230400,
+            "pairedToken": addr.weth,
+            "devBuyFee": 10000
+        };
+        const tokenConfig = {
+            "_name": name,
+            "_symbol": symbol,
+            "_supply": ethers.parseEther("100000000000"), // 100 billion
+            "_fee": 10000,
+            "_salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "_deployer": deployer,
+            "_fid": cast.author.fid,
+            "_image": util.getImageFromCast(cast.embeds),
+            "_castHash": cast.hash,
+            "_poolConfig": poolConfig
+        };
+        var salt, tokenAddress;
+        console.log(tokenConfig["_symbol"], tokenConfig["_deployer"], addr.tokenFactory, addr.pairedToken);
+        const result = await streme.generateSalt(tokenConfig["_symbol"], tokenConfig["_deployer"], addr.tokenFactory, addr.pairedToken);
+        salt = result[0];
+        tokenAddress = result[1];
+        console.log("Salt: ", salt);
+        tokenConfig["_salt"] = salt;
+        console.log(addr.tokenFactory, addr.postDeployFactory, addr.lpFactory, ethers.ZeroAddress, tokenConfig);
+        await streme.deployToken(addr.tokenFactory, addr.postDeployFactory, addr.lpFactory, ethers.ZeroAddress, tokenConfig);
+        console.log("Token Address: ", tokenAddress);
+        // add to firestore + triggers to fecth event data for staking + uniswap pool
+        return tokenAddress;
+    }, // deployToken
+
 
 }; // module.exports
