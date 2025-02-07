@@ -20,14 +20,16 @@ const sleep = (milliseconds) => {
 };
 
 module.exports.mentionCreated = async function (event) {
-    const snapshot = event.data;
+    var snapshot = event.data;
+    if ("after" in snapshot) {
+        snapshot = snapshot.after;
+    }
     if (!snapshot) {
         console.log("No data associated with the event");
         return;
     }
-    const cast = snapshot.data();
-    // TODO: handle the mention
-
+    // TODO: do we need this at all if we are doing the queue via cron?
+    return;
 } // mentionCreated   
 
 module.exports.tokenCreated = async function (event) {
@@ -41,11 +43,44 @@ module.exports.tokenCreated = async function (event) {
 
 } // tokenCreated   
 
-module.exports.mentionCron = async function(minter) {
-    console.log("start mentionCron");
-    //const db = getFirestore();
-    
-    console.log("end mentionCron");
+module.exports.mentionCron = async function(context, minter) {
+    const batchSize = 1;
+  
+    await sleep(1000 * minter);
+  
+    var query = db.collection('mentions').where('status', '==', "pending").orderBy('created','asc').limit(batchSize);
+  
+    var doc;
+    const snapshot = await query.get();
+    if (snapshot.empty) {
+      console.log(`Nothing in this queue, Minter ${minter}`);
+      return;
+    }
+    var count = 0;
+    snapshot.forEach(async doc => {
+      count++;
+      if (doc.exists) {
+        const mention = doc.data();
+        // update status to minting
+        await doc.ref.update({
+          "status": "processing"
+        });
+        const cast = mention.cast;
+        // process cast
+        const result = await util.processMention(cast, minter);
+        var updates = {
+          "status": "status" in result ? result.status : "processed"
+        }
+        if ("reason" in result) {
+          updates.reason = result.reason;
+        }
+        await doc.ref.update(updates);
+      } else {
+        console.log("No such document!");
+      } // if doc.exists
+    }); // for each doc
+    console.log(`Processed ${count} mentions, Minter ${minter}`);
+    return 1;
 } // mentionCron
 
 api.use(cors({ origin: true })); // enable origin cors
@@ -98,9 +133,18 @@ api.get(['/chat'], async function (req, res) {
 
 api.post('/api/webhook/mention/streme', async function (req, res) {
     console.log("mention streme webhook req.body", JSON.stringify(req.body));
+    // TODO: validate the request
     const cast = req.body.data;
+    if (!cast) {
+      return res.json({"result": "error", "response": "No data"});
+    }
+    // TODO: change this prior to production launch + edit neynar webook accordingly
+    if (cast.author.fid != process.env.FREME_FID) {
+        return res.json({"result": "error", "response": "Not a valid cast during streme alpha"});
+    }
     // check if this cast has already been added to mentions collection:
     // firestor doc where doc.id is cast.hash
+    const db = getFirestore();
     const docRef = db.collection('mentions').doc(cast.hash);
     const doc = await docRef.get();
     if (doc.exists) {

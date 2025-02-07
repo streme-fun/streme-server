@@ -41,6 +41,15 @@ exports.mentionCreated = onDocumentCreated("mentions/{castId}", {
         return streme.mentionCreated(event);
 });
 
+exports.mentionUpdated = onDocumentUpdated("mentions/{castId}", {
+    timeoutSeconds: 20,
+    memory: "1GiB",
+},    
+(event) => {
+    // this hook for testing only
+    return streme.mentionCreated(event);
+});
+
 exports.tokenCreated = onDocumentCreated("tokens/{tokenAddress}", {
         timeoutSeconds: 20,
         memory: "1GiB",

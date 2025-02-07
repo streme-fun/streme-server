@@ -62,10 +62,10 @@ module.exports = {
         }
     }, // getProvider
 
-    "autonomeChat": async (message) => {
+    "autonomeChat": async (cast) => {
         const apiUrl = "https://autonome.alt.technology/streme-aelyud/chat";
         const data = {
-            "message": `You are @streme and your primary skill is deploying Super Tokens on request. Super Tokens are ERC20 tokens that can be streamed in real-time by the second, powered by Superfluid. When users request creation of a token, you should extract a name and a symbol from the request, and respond that you will deply the token on the Base network. The tokens you create are sometimes referred to as Streme Coins. Respond only with a JSON object with elements for name, symbol, and response. Do NOT preface the JSON object with any commentary. Your tone is funny and light-hearted. You strive to please but also to make people laugh. You only create tokens when there is a clear request to do so. When making this assessment, you should ONLY consider the text part of the user's message. If you do not detect a request to create or deploy a token, then return null for title and description, and provide a response explaining. If someone asks you about the kinds of tokens you can create, you can tell them: 1) they are native Super Tokens powered by @superfluid, 2) they have built-in staking with streaming rewards, 3) they are immediately tradeable via a Uniswap v3 pool, 4) 40% of trading fees goes to the creator, and 5) you need a Neynar Score of  0.7 or higher to deploy (threshold may change in future\n\n<example>\nInput: @streme please create a token called yellow flowers with a symbol of YELLOW.\nOutput: name = \"Yellow Flowers\", symbol = \"YELLOW\", response: \"Sure I will create a token called Yellow Flowers on the Base network with the symbol YELLOW\n</example>\n<example>\nInput: @streme what type of tokens can you create?\nOutput: I can only create native Super Tokens on the Base network, with real-time streaming powered by @superfluid. The tokens have built-in staking with 20% of the supply being streamed as staking rewards for the first 365 days. The other 80% of supply is locked in a Uniswap v3 pool, with 40% of trading fees going to the deployer.\n</example> The message sender's name is Bob with username @bob. Please reply to their message. Only 5% of the time, you mention the message sender in your response. <message>${message}</message>`
+            "message": `You are @streme and your primary skill is deploying Super Tokens on request. Super Tokens are ERC20 tokens that can be streamed in real-time by the second, powered by Superfluid. When users request creation of a token, you should extract a name and a symbol from the request, and respond that you will deply the token on the Base network. The tokens you create are sometimes referred to as Streme Coins. Respond only with a JSON object with elements for name, symbol, and response. Do NOT preface the JSON object with any commentary. Your tone is funny and light-hearted. You strive to please but also to make people laugh. You only create tokens when there is a clear request to do so. When making this assessment, you should ONLY consider the text part of the user's message. If you do not detect a request to create or deploy a token, then return null for title and description, and provide a response explaining. If someone asks you about the kinds of tokens you can create, you can tell them: 1) they are native Super Tokens powered by @superfluid, 2) they have built-in staking with streaming rewards, 3) they are immediately tradeable via a Uniswap v3 pool, 4) 40% of trading fees goes to the creator, and 5) you need a Neynar Score of  0.7 or higher to deploy (threshold may change in future\n\n<example>\nInput: @streme please create a token called yellow flowers with a symbol of YELLOW.\nOutput: name = \"Yellow Flowers\", symbol = \"YELLOW\", response: \"Sure I will create a token called Yellow Flowers on the Base network with the symbol YELLOW\n</example>\n<example>\nInput: @streme what type of tokens can you create?\nOutput: I can only create native Super Tokens on the Base network, with real-time streaming powered by @superfluid. The tokens have built-in staking with 20% of the supply being streamed as staking rewards for the first 365 days. The other 80% of supply is locked in a Uniswap v3 pool, with 40% of trading fees going to the deployer.\n</example> The message sender's name is ${cast.author.display_name} with username @${cast.author.username}. Please reply to their message. Only 5% of the time, you mention the message sender in your response. <message>${cast.text}</message>`
         };
         const response = await fetch(apiUrl, {
             method: "POST",
@@ -122,12 +122,15 @@ module.exports = {
         }
     }, // getImageFromCast
 
-    "deployToken": async (name, symbol, deployer, cast) => {
+    "deployToken": async (name, symbol, deployer, cast, minter) => {
         const util = module.exports;
         const addr = util.getAddresses();
         const provider = util.getProvider();
         const keys = util.getKeys();
-        const random = Math.floor(Math.random() * keys.length);
+        var random = Math.floor(Math.random() * keys.length);
+        if (minter) {
+            random = minter;
+        }
         const key = keys[random];
         const signer = new ethers.Wallet(key, provider);
         const streme = new ethers.Contract(addr.streme, StremeJSON.abi, signer);
@@ -187,6 +190,10 @@ module.exports = {
         };
         const pool = await util.getUniswapV3Pool(tokenAddress, addr.weth, tokenConfig["_fee"]);
         data["pool_address"] = pool;
+        // add channel if it exists
+        if ("channel" in cast && cast.channel && "id" in cast.channel) {
+            data.channel = cast.channel.id;
+        }
         const db = getFirestore();
         const tokensRef = db.collection("tokens").doc(tokenAddress);
         const tokenDoc = await tokensRef.set(data);
@@ -223,6 +230,161 @@ module.exports = {
             return resolve(castResult);
         }); // return new Promise
     }, // sendCast
+
+    "verifiedAddress": async function(user) {
+        const util = module.exports;
+        return new Promise(async function(resolve, reject) {
+            var address;
+            if (user) {
+                // get last verified eth address
+                if ("verified_addresses" in user) {
+                    if ("eth_addresses" in user.verified_addresses) {
+                        address = user.verified_addresses.eth_addresses[user.verified_addresses.eth_addresses.length-1];
+                    } // if eth_addresses
+                } // if verified_addresses
+            } // if user
+            //console.log("address", address);
+            return resolve(address);
+        }); // return new Promise
+    }, // verifiedAddress
+
+    "processMention": async function (cast, minter) {
+        console.log("processMention started", cast.hash);
+        const util = module.exports;
+        const db = getFirestore();
+        return new Promise(async function(resolve, reject) {
+            const sendCastEnabled = false;
+            // check if user qualifies. neynar score?
+            var allowed = false;
+            const allowList = [
+                process.env.FREME_FID
+            ];
+            // is cast.author.fid in allowList?
+            if (allowList.includes(cast.author.fid)) {
+                allowed = true;
+            }
+            if ("allowed" in cast && cast.allowed) {
+                allowed = true;
+            }
+            if (!allowed) {
+                const minScore = 0.7;
+                if ("experimental" in cast.author && "neynar_user_score" in cast.author.experimental && cast.author.experimental.neynar_user_score < minScore) {
+                    // respond with error that user does not qualify
+                    if (sendCastEnabled) {
+                        await util.sendCast({
+                            "parent": cast.hash,
+                            "text": `Sorry, you do not qualify to deploy Streme coins. Your Neynar score of ${cast.author.experimental.neynar_user_score} is too low.`,
+                            "signer_uuid": process.env.STREME_UUID,
+                        });
+                    }
+                    //return res.json({"result": "error", "response": "User does not qualify"});
+                    console.log(`user does not qualify, username: ${cast.author.username}, neynar_user_score: ${cast.author.experimental.neynar_user_score}`);
+                    return resolve({"status": "error", "reason": "User does not qualify due to neynar_user_score"});
+                } // if minScore
+            } // if !allowed
+        
+            const banList = [
+                6969669, // nobody
+            ];
+            // is cast.author.fid in banList?
+            if (banList.includes(cast.author.fid)) {
+                // respond with error that user is banned
+                if (sendCastEnabled) {
+                    await util.sendCast({
+                        "parent": cast.hash,
+                        "text": `Seems like somehow you got banned https://y.yarn.co/d9b730de-cb98-4aad-b955-c813a2f7ee5e_text.gif`,
+                        "signer_uuid": process.env.STEME_UUID,
+                    });
+                }
+                return resolve({"status": "error", "reason": "User is banned"});
+            }
+        
+            // check if this cast has already been processed
+            // query for doc in tokens collection where cast_hash == cast.hash:
+            const query = db.collection("tokens").where("cast_hash", "==", cast.hash);
+            const docRef = await query.get();
+            var doc;
+            docRef.forEach((doc) => {
+                console.log("doc", doc.id, "=>", doc.data());
+                doc = doc;
+            });
+            //var doc = await docRef.get();
+            if (doc.exists) {
+                console.log("doc exists, mention already processed");
+                return resolve({"status": "error", "reason": "Token already created"});
+            }
+                    
+            // send cast to Autonome for processing
+            const ai = await util.autonomeChat(cast);
+        
+            if (!ai.name || !ai.symbol) {
+                // respond with error that token cannot be created
+                if (sendCastEnabled) {
+                        await util.sendCast({
+                            "parent": cast.hash,
+                            "text": ai.response,
+                            "signer_uuid": process.env.FREME_UUID,
+                    });
+                }
+                //return res.json({"result": "error", "response": ai.response});
+                console.log("ai.name not found");
+                return resolve({"status": "error", "reason": "token creation intent not found"});
+            }
+        
+            var creatorAddress = await util.verifiedAddress(cast.author);
+            if (!creatorAddress) {
+                // respond with error that NFT cannot be created
+                if (sendCastEnabled) {
+                    await util.sendCast({
+                        "parent": cast.hash,
+                        "text": `Sorry, you must verify your Ethereum address to launch Streme coins.`,
+                        "signer_uuid": process.env.FREME_UUID,
+                    });
+                }
+                console.log("creatorAddress not found");
+                return resolve({"status": "error", "reason": "creatorAddress not found"});
+            }
+        
+            
+            // deploy token
+            const doDeploy = true;
+            if (doMint) {
+                const tokenAddress = await util.deployToken(ai.name, ai.symbol, creatorAddress, cast, minter);
+                console.log("deployed", tokenAddress);
+                if (!tokenAddress) {
+                    // respond with error that token cannot be created
+                    if (sendCastEnabled) {
+                        await util.sendCast({
+                            "parent": cast.hash,
+                            "text": `Sorry, there was an error creating your token.`,
+                            "signer_uuid": process.env.STREME_UUID,
+                        });
+                    } // if sendCastEnabled
+                    console.log("deploy not successful");
+                    return resolve({"status": "error", "reason": "deploy txn failed"});
+                } // if !minted
+                await util.logDeploy({
+                    "token": tokenAddress,  
+                    "creator": data.fid,
+                });
+            } // if doMint
+            if (sendCastEnabled) {
+                // add frame embed to this cast
+                const frameURL = `https://streme.fun/token/${tokenAddress}`;
+                await util.sendCast({
+                    "parent": cast.hash,
+                    "text": ai.response + `\n\nHere's your Streme coin:`,
+                    "signer_uuid": process.env.STREME_UUID,
+                    "embeds": [
+                        {
+                            "url": frameURL,
+                        }
+                    ]
+                });
+            } // if sendCastEnabled
+            return resolve({"status": "processed"});
+        }); // return promise
+    }, // processMention
 
 
 
