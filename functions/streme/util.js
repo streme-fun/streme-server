@@ -398,8 +398,9 @@ module.exports = {
             
             // deploy token
             const doDeploy = true;
+            var tokenAddress;
             if (doDeploy) {
-                const tokenAddress = await util.deployToken(ai.name, ai.symbol, creatorAddress, cast, minter);
+                tokenAddress = await util.deployToken(ai.name, ai.symbol, creatorAddress, cast, minter);
                 console.log("deployed", tokenAddress);
                 if (!tokenAddress) {
                     // respond with error that token cannot be created
@@ -418,7 +419,7 @@ module.exports = {
                     "creator": cast.author.fid,
                 });
             } // if doMint
-            if (sendCastEnabled) {
+            if (sendCastEnabled && tokenAddress) {
                 // add frame embed to this cast
                 const frameURL = `https://streme.fun/token/${tokenAddress}`;
                 await util.sendCast({
