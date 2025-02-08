@@ -19,6 +19,9 @@ const LPFactoryJSON = require("./abis/LPFactory.json");
 const LpLockerJSON = require("./abis/LpLockerv2.json");
 const SuperTokenFactoryJSON = require("./abis/SuperTokenFactory.json");
 
+const sleep = (milliseconds) => {
+    return new Promise(resolve => setTimeout(resolve, milliseconds))
+};
 
 module.exports = {
 
@@ -187,9 +190,57 @@ module.exports = {
         tokenAddress = tokenAddress.toLowerCase();
         console.log("Salt: ", salt);
         tokenConfig["_salt"] = salt;
-        console.log(addr.tokenFactory, addr.postDeployFactory, addr.lpFactory, ethers.constants.AddressZero, tokenConfig);
-        const tx = await (await streme.deployToken(addr.tokenFactory, addr.postDeployFactory, addr.lpFactory, ethers.constants.AddressZero, tokenConfig)).wait();
-        console.log("Transaction", tx);
+
+        var pending = true;
+        var retries = 0;
+        var gasOptions = {};
+        var tx;
+        while (pending) {
+            try {
+
+                if (util.chain == "base") {
+                    // get Base gas prices from gasstation
+                    try {
+                        console.log("fetching gas from gasstation");
+                        var resGas = await fetch('https://frm.lol/api/gas/base');
+                        var gas = await resGas.json();
+                        if (gas) {
+                            gasOptions = gas;
+                            console.log("from /api/gas/base", gas);
+                        }
+                    } catch (e) {
+                        console.log(e);
+                    } // try
+                } // if chain
+                console.log(addr.tokenFactory, addr.postDeployFactory, addr.lpFactory, ethers.constants.AddressZero, tokenConfig, gasOptions);
+                tx = await (await streme.deployToken(addr.tokenFactory, addr.postDeployFactory, addr.lpFactory, ethers.constants.AddressZero, tokenConfig, gasOptions)).wait();
+                console.log("Transaction", tx);
+                pending = false;
+
+            } catch (e) {
+
+                const errorCode = e.code;
+                console.log(errorCode);
+                if (errorCode && (errorCode == "REPLACEMENT_UNDERPRICED" || errorCode == "NONCE_EXPIRED")) {
+                    pending = true;
+                    retries++;
+                    console.log("NONCE issue. Retry count " + retries);
+                    // random number between 1000 and 5000:
+                    const delay = Math.floor(Math.random() * 4000) + 1000;
+                    console.log("delay", delay);
+                    await sleep(delay);
+                } else {
+                    console.log("exiting pending loop: error:", e);
+                    pending = false;
+                }
+
+            } // catch
+        } // while pending
+
+        if (!tx) {
+            console.log("tx not found");
+            return false;
+        }
         const txnHash = tx.transactionHash;
         const blockNumber = tx.blockNumber;
         console.log("Token Address: ", tokenAddress);
@@ -218,8 +269,6 @@ module.exports = {
             "postLpHook": ethers.constants.AddressZero,
             "poolConfig": poolConfig,
         };
-        //const pool = await util.getUniswapV3Pool(tokenAddress, addr.weth, tokenConfig["_fee"]);
-        //data["pool_address"] = pool;
         // add channel if it exists
         if ("channel" in cast && cast.channel && "id" in cast.channel) {
             data.channel = cast.channel.id;
