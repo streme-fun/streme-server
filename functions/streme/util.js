@@ -371,7 +371,7 @@ module.exports = {
                 "staked": parseFloat(ethers.utils.formatEther(await superToken.balanceOf(token.staking_address))),
                 "rewards": parseFloat(ethers.utils.formatEther(await superToken.balanceOf(token.postDeployHook)))
             };
-            stats.holdings.others = 100000000000 - stats.holdings.lpPool + stats.holdings.staked + stats.holdings.rewards;
+            stats.holdings.others = 100000000000 - stats.holdings.lpPool - stats.holdings.staked - stats.holdings.rewards;
             return resolve(stats);
         }); // return new Promise
     }, // getTokenStats
