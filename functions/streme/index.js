@@ -63,7 +63,7 @@ module.exports.tokenCreated = async function (event) {
     }
     const token = snapshot.data();
     log("tokenCreated", token);
-    const poolAddress = await util.getUniswapV3Pool(token);
+    const poolAddress = await util.getUniswapV3PoolFromEvent(token);
     log("pool", poolAddress);
     const staking = await util.getStakingData(token);
     log("staking", staking);
@@ -173,6 +173,29 @@ api.get(['/token/:address'], async function (req, res) {
         res.json(token);
     }
 }); // GET /token/:address
+
+api.get(['/token/:address/stats'], async function (req, res) {
+    const address = req.params.address;
+    const stats = await util.getTokenStats(address);
+    // cache for 1 minute:
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=120');
+    res.json(stats);
+}); // GET /token/:address/stats
+
+api.get(['/token/:address/unipool'], async function (req, res) {
+    const address = req.params.address;
+    const db = getFirestore();
+    const tokenRef = db.collection('tokens').doc(address);
+    const doc = await tokenRef.get();
+    if (!doc.exists) {
+        console.log('No such document!');
+        return res.json({ message: 'No such document!' });
+    } else {
+        const token = doc.data();
+        const poolAddress = await util.getUniswapV3PoolFromEvent(token);
+        return res.json({ pool_address: poolAddress });
+    }
+}); // GET /token/:address/unipool
 
 api.get(['/chat'], async function (req, res) {
     console.log("start GET /chat path", req.path);

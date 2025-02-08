@@ -18,6 +18,7 @@ const StakedTokenJSON = require("./abis/StakedToken.json");
 const LPFactoryJSON = require("./abis/LPFactory.json");
 const LpLockerJSON = require("./abis/LpLockerv2.json");
 const SuperTokenFactoryJSON = require("./abis/SuperTokenFactory.json");
+const UniswapV3FactoryJSON = require("./abis/UniswapV3Factory.json");
 
 const sleep = (milliseconds) => {
     return new Promise(resolve => setTimeout(resolve, milliseconds))
@@ -321,6 +322,60 @@ module.exports = {
             resolve({"stakeToken": stakeToken.toLowerCase(), "pool": pool.toLowerCase()});
         }); // return new Promise
     }, // getStakingData
+
+    "getUniswapV3PoolFromEvent": async (token) => {
+        return new Promise(async (resolve, reject) => {
+            const util = module.exports;
+            const addr = util.getAddresses();
+            const provider = util.getProvider();
+            const uniswapV3Factory = new ethers.Contract(addr.uniswapV3Factory, UniswapV3FactoryJSON.abi, provider);
+            const filter = uniswapV3Factory.filters.PoolCreated();
+            const logs = await uniswapV3Factory.queryFilter(filter, token.block_number, token.block_number);
+            console.log("logs", logs);
+            var pool = '';
+            for (var i = 0; i < logs.length; i++) {
+                const eventLog = logs[i];
+                const parsedLog = uniswapV3Factory.interface.parseLog(eventLog);
+                console.log("parsedLog", parsedLog);
+                if (parsedLog.args.token0.toLowerCase() == token.contract_address.toLowerCase() || parsedLog.args.token1.toLowerCase() == token.contract_address.toLowerCase()) {
+                    pool = parsedLog.args.pool;
+                }
+            }
+            resolve(pool.toLowerCase());
+        }); // return new Promise
+    }, // getUniswapV3PoolFromEvent
+
+
+    "getTokenStats": async (tokenAddress) => {
+        return new Promise(async (resolve, reject) => {
+            const util = module.exports;
+            var stats = {};
+            const provider = util.getProvider();
+            const db = getFirestore();
+            const tokensRef = db.collection("tokens").doc(tokenAddress.toLowerCase());
+            const tokenDoc = await tokensRef.get();
+            if (!tokenDoc.exists) {
+                return resolve(null);
+            }
+            const token = tokenDoc.data();
+            const stakeToken = new ethers.Contract(token.staking_address, StakedTokenJSON.abi, provider);
+            const superAbi = [ "function balanceOf(address account) external view returns (uint256)" ];
+            const superToken = new ethers.Contract(tokenAddress, superAbi, provider);
+            stats.staked = await stakeToken.totalSupply();
+            stats.staked = parseFloat(ethers.utils.formatEther(stats.staked));
+            stats.flowRate = 634.1958449; // 1 per second (x 10^18)
+            stats.totalUnits = stats.staked;
+            stats.apr = stats.flowRate * 31536000 / stats.totalUnits * 100;
+            stats.holdings = {
+                "lpPool": parseFloat(ethers.utils.formatEther(await superToken.balanceOf(token.pool_address))),
+                "staked": parseFloat(ethers.utils.formatEther(await superToken.balanceOf(token.staking_address))),
+                "rewards": parseFloat(ethers.utils.formatEther(await superToken.balanceOf(token.postDeployHook)))
+            };
+            stats.holdings.others = 100000000000 - stats.holdings.lpPool + stats.holdings.staked + stats.holdings.rewards;
+            return resolve(stats);
+        }); // return new Promise
+    }, // getTokenStats
+
 
     "sendCast": async function(cast) {
         const util = module.exports;
