@@ -22,7 +22,7 @@ const SuperTokenFactoryJSON = require("./abis/SuperTokenFactory.json");
 
 module.exports = {
 
-    "chain": "baseSepolia",
+    "chain": "base",
 
     "chainId": () => {
         const util = module.exports;
@@ -39,6 +39,17 @@ module.exports = {
         const util = module.exports;
         var addr = {};
         if (util.chain == "baseSepolia") {
+            addr.streme = process.env.STREME_BASESEP;
+            addr.stakingFactory = process.env.STREME_BASESEP_STAKING_FACTORY;
+            addr.postDeployFactory = process.env.STREME_BASESEP_STAKING_FACTORY;
+            addr.lpFactory = process.env.STREME_BASESEP_LP_FACTORY;
+            addr.superTokenFactory = process.env.STREME_BASESEP_SUPER_TOKEN_FACTORY;
+            addr.tokenFactory = process.env.STREME_BASESEP_SUPER_TOKEN_FACTORY;
+            addr.lpLocker = process.env.STREME_BASESEP_LIQUIDITY_LOCKER;
+            addr.uniswapV3Factory = process.env.BASESEP_UNISWAP_V3_FACTORY;
+            addr.weth = process.env.BASESEP_WETH;
+            addr.gdaForwarder = process.env.BASESEP_GDA_FORWARDER;
+        } else if (util.chain == "base") {
             addr.streme = process.env.STREME;
             addr.stakingFactory = process.env.STREME_STAKING_FACTORY;
             addr.postDeployFactory = process.env.STREME_STAKING_FACTORY;
@@ -49,8 +60,6 @@ module.exports = {
             addr.uniswapV3Factory = process.env.UNISWAP_V3_FACTORY;
             addr.weth = process.env.WETH;
             addr.gdaForwarder = process.env.GDA_FORWARDER;
-        } else if (util.chain == "base") {
-            // TODO: add addresses for base chain
         }
         return addr;
     }, // getAddresses
