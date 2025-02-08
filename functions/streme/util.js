@@ -389,7 +389,10 @@ module.exports = {
             }
             const token = tokenDoc.data();
             const stakeToken = new ethers.Contract(token.staking_address, StakedTokenJSON.abi, provider);
-            const superAbi = [ "function balanceOf(address account) external view returns (uint256)" ];
+            const superAbi = [ 
+                "function balanceOf(address account) external view returns (uint256)",
+                "function allowance(address owner, address spender) external view returns (uint256)"
+            ];
             const superToken = new ethers.Contract(tokenAddress, superAbi, provider);
             const poolAddress = token.staking_pool;
             const memberAddress = userAddress;
