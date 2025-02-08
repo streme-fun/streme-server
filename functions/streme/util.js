@@ -376,6 +376,65 @@ module.exports = {
         }); // return new Promise
     }, // getTokenStats
 
+    "getTokenStatsForUser": async (tokenAddress, userAddress) => {
+        return new Promise(async (resolve, reject) => {
+            const util = module.exports;
+            var stats = {};
+            const provider = util.getProvider();
+            const db = getFirestore();
+            const tokensRef = db.collection("tokens").doc(tokenAddress.toLowerCase());
+            const tokenDoc = await tokensRef.get();
+            if (!tokenDoc.exists) {
+                return resolve(null);
+            }
+            const token = tokenDoc.data();
+            const stakeToken = new ethers.Contract(token.staking_address, StakedTokenJSON.abi, provider);
+            const superAbi = [ "function balanceOf(address account) external view returns (uint256)" ];
+            const superToken = new ethers.Contract(tokenAddress, superAbi, provider);
+            const poolAddress = token.staking_pool;
+            const memberAddress = userAddress;
+            const abi = [
+                "function getUnits(address memberAddress) external view returns (uint128)",
+                "function getTotalUnits() external view returns (uint128)",
+                "function getTotalFlowRate() external view returns (int96)",
+                "function getMemberFlowRate(address memberAddress) external view returns (int96)",
+                "function getClaimableNow(address memberAddr) external view returns (int256 claimableBalance, uint256 timestamp)",
+                "function getTotalAmountReceivedByMember(address memberAddr) external view  returns (uint256)",
+                "function claimAll(address memberAddr) external returns (bool)"
+            ];
+            const contract = new ethers.Contract(poolAddress, abi, provider);
+            var units = await contract.getUnits(memberAddress);
+            var received = await contract.getTotalAmountReceivedByMember(memberAddress);
+            received = received / 1e18;
+            received = received.toFixed(2);
+            var flowRate = await contract.getMemberFlowRate(memberAddress);
+            flowRate = flowRate / 1e18;
+            flowRate = flowRate.toFixed(2);
+            var claimable = await contract.getClaimableNow(memberAddress);
+            claimable = claimable[0] / 1e18;
+            claimable = claimable.toFixed(2);
+            // GDA
+            const gdaABI = [
+                "function isMemberConnected(address pool, address member) external view returns (bool)",
+                "function connectPool(address pool, bytes userData) external returns (bool)"
+            ];
+            const gdaContract = new ethers.Contract(process.env.GDA_FORWARDER, gdaABI, provider);
+            var connected = await gdaContract.isMemberConnected(poolAddress, memberAddress);
+    
+            stats.unstaked = parseFloat(ethers.utils.formatEther(await superToken.balanceOf(userAddress)));
+            stats.staked = parseFloat(ethers.utils.formatEther(await stakeToken.balanceOf(userAddress)));
+            stats.stakingAllowance = parseFloat(ethers.utils.formatEther(await superToken.allowance(userAddress, token.staking_address)));
+            stats.flowRate = flowRate; // per second, whole units
+            stats.memberUnits = units;
+            stats.totalUnits = await contract.getTotalUnits();
+            stats.claimable = claimable;
+            stats.received = received;
+            stats.connected = connected;
+            stats.apr = stats.flowRate * 31536000 / stats.memberUnits * 100;
+            return resolve(stats);
+        }); // return new Promise
+    }, // getTokenStatsForUser
+
 
     "sendCast": async function(cast) {
         const util = module.exports;

@@ -182,6 +182,15 @@ api.get(['/token/:address/stats'], async function (req, res) {
     res.json(stats);
 }); // GET /token/:address/stats
 
+api.get(['/token/:address/stats/:userAddress'], async function (req, res) {
+    const address = req.params.address;
+    const userAddress = req.params.userAddress;
+    const stats = await util.getTokenStatsForUser(address, userAddress);
+    // cache for 1 minute:
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=120');
+    res.json(stats);
+}); // GET /token/:address/stats/:userAddress
+
 api.get(['/token/:address/unipool'], async function (req, res) {
     const address = req.params.address;
     const db = getFirestore();
