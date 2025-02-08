@@ -358,7 +358,7 @@ module.exports = {
                 return resolve(null);
             }
             const token = tokenDoc.data();
-            const stakeToken = new ethers.Contract(token.staking_address, StakedTokenJSON.abi, provider);
+            const stakeToken = new ethers.Contract(token["staking_address"], StakedTokenJSON.abi, provider);
             const superAbi = [ "function balanceOf(address account) external view returns (uint256)" ];
             const superToken = new ethers.Contract(tokenAddress, superAbi, provider);
             stats.staked = await stakeToken.totalSupply();
@@ -367,8 +367,8 @@ module.exports = {
             stats.totalUnits = stats.staked;
             stats.apr = stats.flowRate * 31536000 / stats.totalUnits * 100;
             stats.holdings = {
-                "lpPool": parseFloat(ethers.utils.formatEther(await superToken.balanceOf(token.pool_address))),
-                "staked": parseFloat(ethers.utils.formatEther(await superToken.balanceOf(token.staking_address))),
+                "lpPool": parseFloat(ethers.utils.formatEther(await superToken.balanceOf(token["pool_address"]))),
+                "staked": parseFloat(ethers.utils.formatEther(await superToken.balanceOf(token["staking_address"]))),
                 "rewards": parseFloat(ethers.utils.formatEther(await superToken.balanceOf(token.postDeployHook)))
             };
             stats.holdings.others = 100000000000 - stats.holdings.lpPool - stats.holdings.staked - stats.holdings.rewards;
@@ -381,6 +381,7 @@ module.exports = {
             const util = module.exports;
             var stats = {};
             const provider = util.getProvider();
+            const addr = util.getAddresses();
             const db = getFirestore();
             const tokensRef = db.collection("tokens").doc(tokenAddress.toLowerCase());
             const tokenDoc = await tokensRef.get();
@@ -388,13 +389,13 @@ module.exports = {
                 return resolve(null);
             }
             const token = tokenDoc.data();
-            const stakeToken = new ethers.Contract(token.staking_address, StakedTokenJSON.abi, provider);
+            const stakeToken = new ethers.Contract(token["staking_address"], StakedTokenJSON.abi, provider);
             const superAbi = [ 
                 "function balanceOf(address account) external view returns (uint256)",
                 "function allowance(address owner, address spender) external view returns (uint256)"
             ];
             const superToken = new ethers.Contract(tokenAddress, superAbi, provider);
-            const poolAddress = token.staking_pool;
+            const poolAddress = token["staking_pool"];
             const memberAddress = userAddress;
             const abi = [
                 "function getUnits(address memberAddress) external view returns (uint128)",
@@ -421,15 +422,16 @@ module.exports = {
                 "function isMemberConnected(address pool, address member) external view returns (bool)",
                 "function connectPool(address pool, bytes userData) external returns (bool)"
             ];
-            const gdaContract = new ethers.Contract(process.env.GDA_FORWARDER, gdaABI, provider);
+            const gdaContract = new ethers.Contract(addr.gdaForwarder, gdaABI, provider);
             var connected = await gdaContract.isMemberConnected(poolAddress, memberAddress);
     
             stats.unstaked = parseFloat(ethers.utils.formatEther(await superToken.balanceOf(userAddress)));
             stats.staked = parseFloat(ethers.utils.formatEther(await stakeToken.balanceOf(userAddress)));
-            stats.stakingAllowance = parseFloat(ethers.utils.formatEther(await superToken.allowance(userAddress, token.staking_address)));
+            stats.stakingAllowanceWei = (await superToken.allowance(userAddress, token["staking_address"])).toString();
+            stats.allowance = ethers.utils.formatEther(await superToken.allowance(userAddress, token["staking_address"])).toString();
             stats.flowRate = flowRate; // per second, whole units
-            stats.memberUnits = units;
-            stats.totalUnits = await contract.getTotalUnits();
+            stats.memberUnits = parseFloat(units);
+            stats.totalUnits = parseFloat(await contract.getTotalUnits());
             stats.claimable = claimable;
             stats.received = received;
             stats.connected = connected;

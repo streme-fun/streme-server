@@ -186,8 +186,8 @@ api.get(['/token/:address/stats/:userAddress'], async function (req, res) {
     const address = req.params.address;
     const userAddress = req.params.userAddress;
     const stats = await util.getTokenStatsForUser(address, userAddress);
-    // cache for 1 minute:
-    res.set('Cache-Control', 'public, max-age=60, s-maxage=120');
+    // cache for 5 minutes:
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=600');
     res.json(stats);
 }); // GET /token/:address/stats/:userAddress
 
