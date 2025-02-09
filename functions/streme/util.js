@@ -540,20 +540,35 @@ module.exports = {
                 allowed = true;
             }
             if (!allowed) {
-                const minScore = 0.7;
-                if ("experimental" in cast.author && "neynar_user_score" in cast.author.experimental && cast.author.experimental.neynar_user_score < minScore) {
+                const useNeynar = false;
+                if (useNeynar) {
+                    const minScore = 0.7;
+                    if ("experimental" in cast.author && "neynar_user_score" in cast.author.experimental && cast.author.experimental.neynar_user_score < minScore) {
+                        // respond with error that user does not qualify
+                        if (sendCastEnabled) {
+                            await util.sendCast({
+                                "parent": cast.hash,
+                                "text": `Sorry, you do not qualify to deploy Streme coins. Your Neynar score of ${cast.author.experimental.neynar_user_score} is too low.`,
+                                "signer_uuid": process.env.STREME_UUID,
+                            });
+                        }
+                        //return res.json({"result": "error", "response": "User does not qualify"});
+                        console.log(`user does not qualify, username: ${cast.author.username}, neynar_user_score: ${cast.author.experimental.neynar_user_score}`);
+                        return resolve({"status": "error", "reason": "User does not qualify due to neynar_user_score"});
+                    } // if minScore
+                } else {
                     // respond with error that user does not qualify
                     if (sendCastEnabled) {
                         await util.sendCast({
                             "parent": cast.hash,
-                            "text": `Sorry, you do not qualify to deploy Streme coins. Your Neynar score of ${cast.author.experimental.neynar_user_score} is too low.`,
+                            "text": `Sorry, ur not on the list. You are too early. If you are a judge or sponsor for the Agentic Ethereum Hackathon by @ETHGlobal, please contact @markcarey to be added to the allow list.`,
                             "signer_uuid": process.env.STREME_UUID,
                         });
                     }
                     //return res.json({"result": "error", "response": "User does not qualify"});
-                    console.log(`user does not qualify, username: ${cast.author.username}, neynar_user_score: ${cast.author.experimental.neynar_user_score}`);
-                    return resolve({"status": "error", "reason": "User does not qualify due to neynar_user_score"});
-                } // if minScore
+                    console.log("user does not qualify");
+                    return resolve({"status": "error", "reason": "User does not qualify"});
+                }
             } // if !allowed
         
             const banList = [
@@ -641,7 +656,7 @@ module.exports = {
             } // if doMint
             if (sendCastEnabled && tokenAddress) {
                 // add frame embed to this cast
-                const frameURL = `https://streme.fun/token/${tokenAddress}`;
+                const frameURL = `https://api.streme.fun/token/${tokenAddress}/v1frame`;
                 await util.sendCast({
                     "parent": cast.hash,
                     "text": ai.response + `\n\nHere's your Streme coin:`,

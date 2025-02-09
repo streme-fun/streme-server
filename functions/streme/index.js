@@ -206,7 +206,7 @@ api.get(['/token/:address/unipool'], async function (req, res) {
     }
 }); // GET /token/:address/unipool
 
-api.get(['/token/:address/f'], async function (req, res) {
+api.get(['/token/:address/v1frame'], async function (req, res) {
     const address = req.params.address;
     const db = getFirestore();
     const tokenRef = db.collection('tokens').doc(address.toLowerCase());
@@ -241,7 +241,7 @@ api.get(['/token/:address/f'], async function (req, res) {
               <meta name="fc:frame:button:1:target" content="https://streme.fun/token/${token.contract_address}" />
               <meta name="fc:frame:button:2" content="Share" />
               <meta name="fc:frame:button:2:action" content="link" />
-              <meta name="fc:frame:button:2:target" content="https://warpcast.com/~/compose?text=Check%20out%20$${token.symbol}%20deployed%20by%20@${mention.cast.author.username}%20on%20Streme.fun!&embeds[]=https://streme.fun/token/${token.contract_address}" />
+              <meta name="fc:frame:button:2:target" content="https://warpcast.com/~/compose?text=Check%20out%20$${token.symbol}%20deployed%20by%20@${mention.cast.author.username}%20on%20Streme.fun!&embeds[]=https://api.streme.fun/token/${token.contract_address}/v1frame" />
               <meta name="og:image" content="${token.img_url}" />
               <meta name="og:title" content="${token.name}" />
           </head>
