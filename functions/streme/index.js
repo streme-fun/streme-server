@@ -206,6 +206,65 @@ api.get(['/token/:address/unipool'], async function (req, res) {
     }
 }); // GET /token/:address/unipool
 
+api.get(['/token/:address/f'], async function (req, res) {
+    const address = req.params.address;
+    const db = getFirestore();
+    const tokenRef = db.collection('tokens').doc(address.toLowerCase());
+    const doc = await tokenRef.get();
+    // caching:
+    res.set('Cache-Control', 'public, max-age=600, s-maxage=1200');
+    if (!doc.exists) {
+        console.log('No such document!');
+        res.json({ message: 'No such document!' });
+    } else {
+        const token = doc.data();
+        // get mention doc:
+        const mentionRef = db.collection('mentions').doc(token.cast_hash);
+        const mentionDoc = await mentionRef.get();
+        if (!mentionDoc.exists) {
+            console.log('No such mention document!');
+            return res.json({ message: 'No such mention document!' });
+        }
+        const mention = mentionDoc.data();
+        const html = `
+        <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <title>${token.name}</title>
+              <meta charSet="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1" />
+              <meta name="fc:frame" content="vNext" />
+              <meta name="fc:frame:image" content="${token.img_url}" />
+              <meta name="fc:frame:image:aspect_ratio" content="1:1" />
+              <meta name="fc:frame:button:1" content="Trade" />
+              <meta name="fc:frame:button:1:action" content="link" />
+              <meta name="fc:frame:button:1:target" content="https://streme.fun/token/${token.contract_address}" />
+              <meta name="fc:frame:button:2" content="Share" />
+              <meta name="fc:frame:button:2:action" content="link" />
+              <meta name="fc:frame:button:2:target" content="https://warpcast.com/~/compose?text=Check%20out%20$${token.symbol}%20deployed%20by%20@${mention.cast.author.username}%20on%20Streme.fun!&embeds[]=https://streme.fun/token/${token.contract_address}" />
+              <meta name="og:image" content="${token.img_url}" />
+              <meta name="og:title" content="${token.name}" />
+          </head>
+
+          <body>
+            <h1>${token.name}</h1>
+            <div>
+              <img src="${token.img_url}" width="400" />
+            </div>
+            <script>
+              setTimeout(function() {
+                  window.location.href = 'https://streme.fun/token/${token.contract_address}';
+              }
+              , 100);
+          </script>
+          </body>
+
+          </html>
+        `;
+        res.send(html);
+    } // if doc.exists
+}); // GET /token/:address/f
+
 api.get(['/chat'], async function (req, res) {
     console.log("start GET /chat path", req.path);
     //res.set('Cache-Control', 'public, max-age=60, s-maxage=120');
