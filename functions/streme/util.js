@@ -345,6 +345,49 @@ module.exports = {
         }); // return new Promise
     }, // getUniswapV3PoolFromEvent
 
+    "staking": async (token) => {
+        return new Promise(async (resolve, reject) => {
+            const util = module.exports;
+            const addr = util.getAddresses();
+            const provider = util.getProvider();
+
+            // before staking, user must approve the staking contract to spend their streme coins
+            const superAbi = [ "function approve(address spender, uint256 amount) external returns (bool)" ];
+            const superToken = new ethers.Contract(token.contract_address, superAbi, provider);
+            // TODO: do approval
+
+            // user calls stake or unstake on the staking contract -- stake requires approval first
+            // and most be holding amount of streme coins
+            // unstake does not require approval
+            // `to` in both cases should usually be the msg.sender
+            const stakingAbi = [
+                "function stake(address to, uint256 amount) external",
+                "function unstake(address to, uint256 amount) external",
+            ]
+            const stakedToken = new ethers.Contract(token.staking_address, stakingAbi, provider);
+            // TODO: do stake or unstake
+
+            // user can now connect to pool to see tokens in wallet
+            const gdaABI = [
+                "function isMemberConnected(address pool, address member) external view returns (bool)",
+                "function connectPool(address pool, bytes userData) external returns (bool)"
+            ];
+            const gdaContract = new ethers.Contract(addr.gdaForwarder, gdaABI, provider);
+            // use isMemberConnected to check if user is already connected
+            // pool == token.staking_pool
+            // member == user address
+            const connected = await gdaContract.isMemberConnected(token.staking_pool, userAddress);
+            if (!connected) {
+                // connectPool
+                // pool == token.staking_pool
+                // userData == bytes -- can be empty "0x"
+                const userData = "0x";
+                const connected = await gdaContract.connectPool(token.staking_pool, userData);
+            }
+            resolve(connected);
+        }); // return new Promise
+    }, // staking
+
 
     "getTokenStats": async (tokenAddress) => {
         return new Promise(async (resolve, reject) => {
